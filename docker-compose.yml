@@ -1,0 +1,119 @@
+version: "3.1"
+
+volumes:
+  prometheus_data: { }
+  grafana_data: { }
+  nifi_data: { }
+
+services:
+
+  influxdb:
+    image: influxdb
+    container_name: influxdb
+    hostname: influxdb
+    ports:
+      - "8083:8083"
+      - "8086:8086"
+      - "8090:8090"
+    networks:
+      - nifinet
+    environment:
+      INFLUXDB_DB: "db"
+      INFLUXDB_USER: "user"
+      INFLUXDB_USER_PASSWORD: "pass"
+
+  nifi:
+    container_name: nifi
+    hostname: nifi
+#    image: apache/nifi:latest
+    build: .
+    user: root
+    networks:
+      - nifinet
+    ports:
+      - "8080:8080"
+      - "9092:9092"
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+      - TZ=America/Sao_Paulo
+    links:
+      - influxdb
+
+#  zookeeper:
+#    container_name: zookeeper
+#    hostname: zookeeper
+#    image: confluentinc/cp-zookeeper:latest
+#    networks:
+#      - nifinet
+#    ports:
+#      - "2182:2181"
+#    environment:
+#      - ZOO_MY_ID=1
+#      - ZOOKEEPER_CLIENT_PORT=2181
+#      - ZOOKEEPER_TICK_TIME=2000
+#      - TZ=America/Sao_Paulo
+#
+#  kafka:
+#    container_name: kafka
+#    hostname: kafka
+#    image: confluentinc/cp-kafka:latest
+#    networks:
+#      - nifinet
+#    depends_on:
+#      - zookeeper
+#    ports:
+#      - "9093:9094"
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    environment:
+#      - KAFKA_BROKER_ID=1
+#      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+#      - KAFKA_LISTENERS=PLAINTEXT://:29094,PLAINTEXT_HOST://:9094
+#      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29094,PLAINTEXT_HOST://localhost:9093
+#      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+#      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+#      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+#      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+#      - TZ=America/Sao_Paulo
+
+  prometheus:
+    container_name: prometheus
+    hostname: prometheus
+    image: prom/prometheus
+    networks:
+      - nifinet
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    container_name: grafana
+    hostname: grafana
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+      - influxdb
+    environment:
+      - TZ=America/Sao_Paulo
+    networks:
+      - nifinet
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    restart: always
+
+networks:
+  nifinet:
+    driver: bridge

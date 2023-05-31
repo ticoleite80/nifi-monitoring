@@ -1,0 +1,16 @@
+# my global config
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+  external_labels:
+      monitor: 'nifi-monitoring'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  - job_name: 'nifi_reporting_job'
+
+    scrape_interval: 5s
+    static_configs:
+        - targets: ['nifi:9092']
